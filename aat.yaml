@@ -1,0 +1,17 @@
+# Run manifest for AI Assisted Testing (AAT)
+name: foliotrack
+runtime: python
+install:
+  - python -m pip install -r requirements.txt
+start: "python -m uvicorn main:app --host 127.0.0.1 --port {port}"
+port: 8200
+health_check:
+  path: /health
+  expect_status: 200
+  timeout_sec: 60
+docs:
+  prd: docs/FolioTrack_PRD.md
+  api_spec: docs/FolioTrack_API_Spec.yaml
+test_types:
+  - api
+  - ui

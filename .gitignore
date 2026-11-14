@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.aat-venv/
+.pytest_cache/
+*.log
+.DS_Store
+.idea/
+.vscode/
+~$*.docx

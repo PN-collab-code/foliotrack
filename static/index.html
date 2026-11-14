@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FolioTrack</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1d2330; --muted:#6b7385; --line:#e3e6ec;
+          --accent:#2f5bd3; --pos:#137a3f; --neg:#b42318; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--ink); color:#fff; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.3px; }
+  header small { color:#aab2c5; margin-left:8px; font-weight:400; }
+  main { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .hidden { display:none !important; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:9px 16px; font-size:14px; cursor:pointer; }
+  button.link { background:transparent; color:#cfd6e6; padding:4px 8px; }
+  button.danger { background:transparent; color:var(--neg); border:1px solid var(--line); padding:4px 10px; font-size:12px; }
+  .error { color:var(--neg); font-size:13px; margin-top:8px; min-height:18px; }
+  .success { color:var(--pos); font-size:13px; margin-top:8px; min-height:18px; }
+  #login-section { max-width:360px; margin:80px auto; }
+  #login-section .field { margin-bottom:12px; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .summary-card .label { font-size:12px; color:var(--muted); }
+  .summary-card .value { font-size:22px; font-weight:600; margin-top:6px; }
+  .positive { color:var(--pos); }
+  .negative { color:var(--neg); }
+  .grid { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:16px; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  .form-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1.3fr auto; gap:8px; align-items:end; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:8px 6px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:500; font-size:12px; }
+  .alloc-row { margin-bottom:10px; font-size:13px; }
+  .alloc-row .bar { height:8px; background:var(--line); border-radius:4px; margin-top:4px; overflow:hidden; }
+  .alloc-row .fill { height:100%; background:var(--accent); }
+  .empty { color:var(--muted); text-align:center; padding:16px; }
+  footer { text-align:center; font-size:12px; color:var(--muted); margin:24px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FolioTrack <small>personal portfolio tracker · INR</small></h1>
+  <div id="user-bar" class="hidden">
+    <span id="user-name"></span>
+    <button id="logout-btn" class="link" type="button">Log out</button>
+  </div>
+</header>
+
+<main>
+  <section id="login-section" class="card">
+    <h2>Sign in</h2>
+    <form id="login-form" novalidate>
+      <div class="field"><label for="login-username">Username</label><input id="login-username" name="username" autocomplete="username"></div>
+      <div class="field"><label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password"></div>
+      <button id="login-submit" type="submit">Sign in</button>
+      <div id="login-error" class="error" role="alert"></div>
+    </form>
+  </section>
+
+  <section id="app-section" class="hidden">
+    <div class="cards">
+      <div class="card summary-card" id="card-invested"><div class="label">Total invested</div><div class="value" id="summary-invested">–</div></div>
+      <div class="card summary-card" id="card-current"><div class="label">Current value</div><div class="value" id="summary-current">–</div></div>
+      <div class="card summary-card" id="card-pnl"><div class="label">Total P&amp;L</div><div class="value" id="summary-pnl">–</div></div>
+      <div class="card summary-card" id="card-pnl-pct"><div class="label">Total P&amp;L %</div><div class="value" id="summary-pnl-pct">–</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h2>Add transaction</h2>
+      <form id="txn-form" novalidate>
+        <div class="form-row">
+          <div><label for="txn-symbol">Instrument</label><select id="txn-symbol" name="symbol"></select></div>
+          <div><label for="txn-type">Type</label><select id="txn-type" name="type"><option value="BUY">BUY</option><option value="SELL">SELL</option></select></div>
+          <div><label for="txn-quantity">Quantity</label><input id="txn-quantity" name="quantity" type="number" step="1" min="1"></div>
+          <div><label for="txn-price">Price (₹)</label><input id="txn-price" name="price" type="number" step="0.01" min="0.01"></div>
+          <div><label for="txn-date">Trade date</label><input id="txn-date" name="trade_date" type="date"></div>
+          <div><button id="txn-submit" type="submit">Add</button></div>
+        </div>
+        <div id="txn-error" class="error" role="alert"></div>
+        <div id="txn-success" class="success" role="status"></div>
+      </form>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Holdings</h2>
+        <table id="holdings-table">
+          <thead><tr><th>Instrument</th><th>Qty</th><th>Avg cost</th><th>LTP</th><th>Invested</th><th>Current</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead>
+          <tbody id="holdings-body"></tbody>
+        </table>
+        <div id="holdings-empty" class="empty hidden">No holdings yet. Add a BUY transaction to get started.</div>
+      </div>
+      <div class="card">
+        <h2>Asset allocation</h2>
+        <div id="allocation-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Transactions</h2>
+      <table id="transactions-table">
+        <thead><tr><th>Date</th><th>Instrument</th><th>Type</th><th>Qty</th><th>Price</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="transactions-body"></tbody>
+      </table>
+    </div>
+  </section>
+  <footer>Teaching application – not for real investment use. Prices are fixed, illustrative values.</footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const LABELS = { equity: 'Equity', etf: 'ETF', mutual_fund: 'Mutual fund' };
+let token = sessionStorage.getItem('ft_token');
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401 && path !== '/api/login') { logout(); throw new Error('Session expired'); }
+  const body = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) throw new Error((body && body.message) || ('Request failed: ' + res.status));
+  return body;
+}
+
+function signClass(n) { return n < 0 ? 'negative' : 'positive'; }
+function pct(n) { return n.toFixed(2) + '%'; }
+
+function showApp(show) {
+  $('login-section').classList.toggle('hidden', show);
+  $('app-section').classList.toggle('hidden', !show);
+  $('user-bar').classList.toggle('hidden', !show);
+}
+
+function logout() {
+  token = null; sessionStorage.removeItem('ft_token'); sessionStorage.removeItem('ft_user'); showApp(false);
+}
+
+async function loadInstruments() {
+  const list = await api('/api/instruments');
+  $('txn-symbol').innerHTML = list.map(i => `<option value="${i.symbol}">${i.symbol} – ${i.name} (${inr.format(i.ltp)})</option>`).join('');
+}
+
+function renderSummary(s) {
+  $('summary-invested').textContent = inr.format(s.total_invested);
+  $('summary-current').textContent = inr.format(s.total_current_value);
+  $('summary-pnl').textContent = inr.format(s.total_pnl);
+  $('summary-pnl-pct').textContent = pct(s.total_pnl_pct);
+  const cls = signClass(s.total_current_value);
+  for (const id of ['summary-pnl', 'summary-pnl-pct']) {
+    $(id).classList.remove('positive', 'negative');
+    $(id).classList.add(cls);
+  }
+  $('allocation-list').innerHTML = s.allocation.map(a => `
+    <div class="alloc-row" id="alloc-${a.asset_class}">
+      <div style="display:flex;justify-content:space-between"><span>${LABELS[a.asset_class]}</span>
+      <span><span class="alloc-value">${inr.format(a.current_value)}</span> · <span class="alloc-percent">${pct(a.percent)}</span></span></div>
+      <div class="bar"><div class="fill" style="width:${Math.max(0, Math.min(100, a.percent))}%"></div></div>
+    </div>`).join('');
+}
+
+function renderHoldings(rows) {
+  $('holdings-empty').classList.toggle('hidden', rows.length > 0);
+  $('holdings-body').innerHTML = rows.map(h => `
+    <tr id="holding-${h.symbol}" data-symbol="${h.symbol}">
+      <td title="${h.name}">${h.symbol}</td>
+      <td class="h-qty">${h.quantity}</td>
+      <td class="h-avg">${inr.format(h.avg_cost)}</td>
+      <td class="h-ltp">${inr.format(h.ltp)}</td>
+      <td class="h-invested">${inr.format(h.invested_value)}</td>
+      <td class="h-current">${inr.format(h.current_value)}</td>
+      <td class="h-pnl ${signClass(h.pnl)}">${inr.format(h.pnl)}</td>
+      <td class="h-pnl-pct ${signClass(h.pnl)}">${pct(h.pnl_pct)}</td>
+    </tr>`).join('');
+}
+
+function renderTransactions(rows) {
+  $('transactions-body').innerHTML = rows.map(t => `
+    <tr id="txn-row-${t.id}">
+      <td>${t.trade_date}</td><td>${t.symbol}</td><td>${t.type}</td><td>${t.quantity}</td>
+      <td>${inr.format(t.price)}</td><td>${inr.format(t.amount)}</td>
+      <td><button class="danger" id="delete-txn-${t.id}" data-id="${t.id}" type="button">Delete</button></td>
+    </tr>`).join('');
+}
+
+async function refresh() {
+  const [s, h, t] = await Promise.all([api('/api/portfolio/summary'), api('/api/holdings'), api('/api/transactions')]);
+  renderSummary(s); renderHoldings(h); renderTransactions(t);
+}
+
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('login-error').textContent = '';
+  const username = $('login-username').value.trim(), password = $('login-password').value;
+  if (!username || !password) { $('login-error').textContent = 'Username and password are required'; return; }
+  try {
+    const r = await api('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    token = r.access_token; sessionStorage.setItem('ft_token', token); sessionStorage.setItem('ft_user', r.username);
+    await start();
+  } catch (err) { $('login-error').textContent = err.message; }
+});
+
+$('logout-btn').addEventListener('click', logout);
+
+$('txn-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('txn-error').textContent = ''; $('txn-success').textContent = '';
+  const q = $('txn-quantity').value, p = $('txn-price').value;
+  const body = {
+    symbol: $('txn-symbol').value, type: $('txn-type').value,
+    quantity: q === '' ? null : Number(q), price: p === '' ? null : Number(p),
+    trade_date: $('txn-date').value || null,
+  };
+  try {
+    const t = await api('/api/transactions', { method: 'POST', body: JSON.stringify(body) });
+    $('txn-success').textContent = `${t.type} ${t.quantity} ${t.symbol} @ ${inr.format(t.price)} added`;
+    $('txn-quantity').value = ''; $('txn-price').value = '';
+    await refresh();
+  } catch (err) { $('txn-error').textContent = err.message; }
+});
+
+$('transactions-body').addEventListener('click', async (e) => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  $('txn-error').textContent = ''; $('txn-success').textContent = '';
+  try { await api('/api/transactions/' + id, { method: 'DELETE' }); await refresh(); }
+  catch (err) { $('txn-error').textContent = err.message; }
+});
+
+async function start() {
+  showApp(true);
+  $('user-name').textContent = sessionStorage.getItem('ft_user') || '';
+  const d = new Date();
+  $('txn-date').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  await loadInstruments();
+  await refresh();
+}
+
+if (token) start().catch(() => logout());
+</script>
+</body>
+</html>

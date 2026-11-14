@@ -1,0 +1,294 @@
+openapi: 3.0.3
+info:
+  title: FolioTrack API
+  version: 1.0.0
+  description: |
+    Personal investment-portfolio tracker. Teaching application - not for real investment use.
+    Currency INR. Money values are rounded half-up to 2 decimals.
+    Requirement ids (FR-n / AC-n.n) refer to docs/FolioTrack_PRD.md.
+servers:
+  - url: http://127.0.0.1:8200
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: auth
+  - name: transactions
+  - name: portfolio
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Health check (FR-1)
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/login:
+    post:
+      tags: [auth]
+      summary: Log in and get a Bearer token (FR-2)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+            example: { username: investor, password: invest123 }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /api/reset:
+    post:
+      tags: [system]
+      summary: Restore the seed data (FR-3)
+      security: []
+      responses:
+        "200":
+          description: Seed data restored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, transactions]
+                properties:
+                  status: { type: string, enum: [reset] }
+                  transactions: { type: integer, example: 7 }
+  /api/instruments:
+    get:
+      tags: [portfolio]
+      summary: List the fixed instrument master (FR-4)
+      security: []
+      responses:
+        "200":
+          description: The 8 instruments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Instrument" }
+  /api/transactions:
+    get:
+      tags: [transactions]
+      summary: List transactions sorted by trade_date, then id (FR-6)
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Transaction" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [transactions]
+      summary: Add a BUY or SELL transaction (FR-5)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransactionCreate" }
+            example: { symbol: TCS, type: BUY, quantity: 10, price: 3500.00, trade_date: "2025-01-15" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: SELL quantity exceeds the quantity held (AC-5.6, AC-5.7)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: insufficient_holding, message: "Cannot sell 31 units of INFY; current holding is 30" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /api/transactions/{id}:
+    delete:
+      tags: [transactions]
+      summary: Delete a transaction (FR-6)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Unknown id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: not_found, message: "Transaction 999 not found" }
+        "409":
+          description: Delete would leave a negative holding (AC-6.3)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/holdings:
+    get:
+      tags: [portfolio]
+      summary: Current holdings (FR-7)
+      responses:
+        "200":
+          description: One row per instrument with quantity > 0
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Holding" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/portfolio/summary:
+    get:
+      tags: [portfolio]
+      summary: Portfolio totals and asset allocation (FR-8)
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Summary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired token, or wrong credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: unauthorized, message: "Invalid or expired token" }
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationErrorBody" }
+          example: { error: validation_error, message: "quantity must be a whole number between 1 and 10000", field: quantity }
+  schemas:
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok] }
+        version: { type: string, example: 1.0.0 }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, username]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, enum: [bearer] }
+        username: { type: string }
+    Instrument:
+      type: object
+      required: [symbol, name, asset_class, ltp]
+      properties:
+        symbol: { type: string, example: TCS }
+        name: { type: string }
+        asset_class: { $ref: "#/components/schemas/AssetClass" }
+        ltp: { type: number, description: Fixed last traded price (INR) }
+    AssetClass:
+      type: string
+      enum: [equity, etf, mutual_fund]
+    TransactionCreate:
+      type: object
+      required: [symbol, type, quantity, price, trade_date]
+      properties:
+        symbol:
+          type: string
+          description: One of the 8 instrument symbols (case-insensitive)
+        type:
+          type: string
+          enum: [BUY, SELL]
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        price:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          multipleOf: 0.01
+          description: Greater than 0, at most 2 decimals
+        trade_date:
+          type: string
+          format: date
+          description: YYYY-MM-DD, not later than today
+    Transaction:
+      type: object
+      required: [id, symbol, name, type, quantity, price, amount, trade_date]
+      properties:
+        id: { type: integer }
+        symbol: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [BUY, SELL] }
+        quantity: { type: integer }
+        price: { type: number }
+        amount: { type: number, description: quantity x price, rounded half-up to 2 decimals }
+        trade_date: { type: string, format: date }
+    Holding:
+      type: object
+      required: [symbol, name, asset_class, quantity, avg_cost, invested_value, ltp, current_value, pnl, pnl_pct]
+      properties:
+        symbol: { type: string }
+        name: { type: string }
+        asset_class: { $ref: "#/components/schemas/AssetClass" }
+        quantity: { type: integer }
+        avg_cost: { type: number, description: Quantity-weighted average of BUY prices }
+        invested_value: { type: number, description: quantity x avg_cost }
+        ltp: { type: number }
+        current_value: { type: number, description: quantity x ltp }
+        pnl: { type: number, description: current_value - invested_value }
+        pnl_pct: { type: number, description: pnl / invested_value x 100 }
+    AllocationRow:
+      type: object
+      required: [asset_class, current_value, percent]
+      properties:
+        asset_class: { $ref: "#/components/schemas/AssetClass" }
+        current_value: { type: number }
+        percent: { type: number, description: Share of total current value x 100 }
+    Summary:
+      type: object
+      required: [currency, total_invested, total_current_value, total_pnl, total_pnl_pct, holdings_count, allocation]
+      properties:
+        currency: { type: string, enum: [INR] }
+        total_invested: { type: number }
+        total_current_value: { type: number }
+        total_pnl: { type: number }
+        total_pnl_pct: { type: number, description: total_pnl / total_invested x 100 }
+        holdings_count: { type: integer }
+        allocation:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { $ref: "#/components/schemas/AllocationRow" }
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, enum: [unauthorized, not_found, insufficient_holding, method_not_allowed, error] }
+        message: { type: string }
+    ValidationErrorBody:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, enum: [validation_error] }
+        message: { type: string }
+        field: { type: string }
